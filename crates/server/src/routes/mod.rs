@@ -25,10 +25,16 @@ pub mod sessions;
 pub mod tags;
 pub mod task_attempts;
 pub mod tasks;
+pub mod telegram;
 pub mod terminal;
 
 pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
-    // Create routers with different middleware layers
+    // Routes that bypass origin validation (for external webhooks)
+    let webhook_routes = Router::new()
+        .merge(telegram::webhook_router())
+        .with_state(deployment.clone());
+
+    // Create routers with origin validation
     let base_routes = Router::new()
         .route("/health", get(health::health_check))
         .merge(config::router())
@@ -47,6 +53,7 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
         .merge(scratch::router(&deployment))
         .merge(sessions::router(&deployment))
         .merge(terminal::router())
+        .merge(telegram::router(&deployment))
         .nest("/images", images::routes())
         .layer(ValidateRequestHeaderLayer::custom(
             middleware::validate_origin,
@@ -56,6 +63,9 @@ pub fn router(deployment: DeploymentImpl) -> IntoMakeService<Router> {
     Router::new()
         .route("/", get(frontend::serve_frontend_root))
         .route("/{*path}", get(frontend::serve_frontend))
+        // Webhook routes first (no origin validation)
+        .nest("/api", webhook_routes)
+        // Then base routes (with origin validation)
         .nest("/api", base_routes)
         .into_make_service()
 }
