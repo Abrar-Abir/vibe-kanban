@@ -92,6 +92,8 @@ import {
   CreateWorkspaceFromPrBody,
   CreateWorkspaceFromPrResponse,
   CreateFromPrError,
+  TelegramLinkInfo,
+  TelegramStatusResponse,
 } from 'shared/types';
 import type { WorkspaceWithSession } from '@/types/attempt';
 import { createWorkspaceWithSession } from '@/types/attempt';
@@ -1355,5 +1357,34 @@ export const queueApi = {
   getStatus: async (sessionId: string): Promise<QueueStatus> => {
     const response = await makeRequest(`/api/sessions/${sessionId}/queue`);
     return handleApiResponse<QueueStatus>(response);
+  },
+};
+
+// Telegram API for account linking and notifications
+export const telegramApi = {
+  /**
+   * Get the deep link info for Telegram account linking
+   */
+  getLinkInfo: async (): Promise<TelegramLinkInfo> => {
+    const response = await makeRequest('/api/telegram/link');
+    return handleApiResponse<TelegramLinkInfo>(response);
+  },
+
+  /**
+   * Unlink the Telegram account
+   */
+  unlink: async (): Promise<void> => {
+    const response = await makeRequest('/api/telegram/unlink', {
+      method: 'DELETE',
+    });
+    return handleApiResponse<void>(response);
+  },
+
+  /**
+   * Get the current Telegram link status
+   */
+  getStatus: async (): Promise<TelegramStatusResponse> => {
+    const response = await makeRequest('/api/telegram/status');
+    return handleApiResponse<TelegramStatusResponse>(response);
   },
 };
