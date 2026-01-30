@@ -14,7 +14,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use deployment::Deployment;
-use frankenstein::Update;
+use frankenstein::objects::Update;
 use serde::Serialize;
 use services::services::{
     config::{TelegramConfig, save_config_to_file},

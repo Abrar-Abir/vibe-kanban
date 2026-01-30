@@ -362,7 +362,7 @@ export type DirectoryListResponse = { entries: Array<DirectoryEntry>, current_pa
 
 export type SearchMode = "taskform" | "settings";
 
-export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder: boolean, send_message_shortcut: SendMessageShortcut, };
+export type Config = { config_version: string, theme: ThemeMode, executor_profile: ExecutorProfileId, disclaimer_acknowledged: boolean, onboarding_acknowledged: boolean, notifications: NotificationConfig, editor: EditorConfig, github: GitHubConfig, analytics_enabled: boolean, workspace_dir: string | null, last_app_version: string | null, show_release_notes: boolean, language: UiLanguage, git_branch_prefix: string, showcases: ShowcaseState, pr_auto_description_enabled: boolean, pr_auto_description_prompt: string | null, beta_workspaces: boolean, beta_workspaces_invitation_sent: boolean, commit_reminder: boolean, send_message_shortcut: SendMessageShortcut, telegram: TelegramConfig, };
 
 export type NotificationConfig = { sound_enabled: boolean, push_enabled: boolean, sound_file: SoundFile, };
 
@@ -383,6 +383,48 @@ export type UiLanguage = "BROWSER" | "EN" | "FR" | "JA" | "ES" | "KO" | "ZH_HANS
 export type ShowcaseState = { seen_features: Array<string>, };
 
 export type SendMessageShortcut = "ModifierEnter" | "Enter";
+
+export type TelegramConfig = { chat_id: bigint | null, user_id: bigint | null, username: string | null, notifications_enabled: boolean, notify_on_task_done: boolean, include_llm_summary: boolean, };
+
+export type TelegramLinkInfo = { 
+/**
+ * The token used for linking (for reference)
+ */
+token: string, 
+/**
+ * The deep link URL to open in Telegram
+ */
+deep_link: string, 
+/**
+ * Whether the bot is configured (has a token)
+ */
+bot_configured: boolean, };
+
+export type TelegramStatusResponse = { 
+/**
+ * Whether an account is currently linked
+ */
+linked: boolean, 
+/**
+ * The linked Telegram username (if available)
+ */
+username: string | null, 
+/**
+ * Whether notifications are enabled
+ */
+notifications_enabled: boolean, 
+/**
+ * Whether to notify on task completion
+ */
+notify_on_task_done: boolean, 
+/**
+ * Whether to include LLM summaries in notifications
+ */
+include_llm_summary: boolean, 
+/**
+ * Whether the bot is configured (has a token)
+ */
+bot_configured: boolean, };
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 

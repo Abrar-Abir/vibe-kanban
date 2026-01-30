@@ -166,6 +166,12 @@ impl Deployment for LocalDeployment {
 
         let oauth_handoffs = Arc::new(RwLock::new(HashMap::new()));
 
+        // Create Telegram service if bot token is configured
+        let telegram = {
+            let bot_token = std::env::var("TELEGRAM_BOT_TOKEN").ok();
+            bot_token.map(|token| TelegramService::new(Some(token), config.clone(), db.pool.clone()))
+        };
+
         // We need to make analytics accessible to the ContainerService
         // TODO: Handle this more gracefully
         let analytics_ctx = analytics.as_ref().map(|s| AnalyticsContext {
@@ -190,14 +196,6 @@ impl Deployment for LocalDeployment {
         let file_search_cache = Arc::new(FileSearchCache::new());
 
         let pty = PtyService::new();
-
-        // Create Telegram service if bot token is configured
-        let telegram = {
-            let cfg = config.read().await;
-            let bot_token = cfg.telegram.bot_token.clone();
-            drop(cfg);
-            bot_token.map(|token| TelegramService::new(Some(token), config.clone(), db.pool.clone()))
-        };
 
         let deployment = Self {
             config,

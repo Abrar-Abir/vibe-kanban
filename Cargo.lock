@@ -6719,6 +6719,7 @@ dependencies = [
  "deployment",
  "dotenv",
  "executors",
+ "frankenstein",
  "futures-util",
  "git",
  "git2",
