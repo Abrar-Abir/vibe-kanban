@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TelegramLogo, LinkBreak, ArrowSquareOut } from '@phosphor-icons/react';
+import { TelegramLogoIcon, LinkBreakIcon, ArrowSquareUpRightIcon } from '@phosphor-icons/react';
 
 import { telegramApi } from '@/lib/api';
 import { SettingsCard, SettingsCheckbox } from './SettingsComponents';
@@ -29,7 +29,7 @@ export function IntegrationsSettingsSectionContent() {
   const [unlinking, setUnlinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     try {
       const statusResponse = await telegramApi.getStatus();
       setStatus(statusResponse);
@@ -45,11 +45,11 @@ export function IntegrationsSettingsSectionContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchStatus();
-  }, []);
+  }, [fetchStatus]);
 
   const handleUnlink = async () => {
     if (!status?.linked) return;
@@ -111,8 +111,8 @@ export function IntegrationsSettingsSectionContent() {
             <div className="flex items-center justify-between p-4 rounded-sm bg-secondary/50 border border-border">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-sm bg-[#0088cc]/10">
-                  <TelegramLogo
-                    className="size-5 text-[#0088cc]"
+                  <TelegramLogoIcon
+                    className="size-icon-base text-[#0088cc]"
                     weight="fill"
                   />
                 </div>
@@ -132,8 +132,7 @@ export function IntegrationsSettingsSectionContent() {
                 value={t('integrations.telegram.unlink')}
                 onClick={handleUnlink}
                 disabled={unlinking}
-                actionIcon={unlinking ? 'spinner' : undefined}
-                icon={<LinkBreak className="size-icon-xs" weight="bold" />}
+                actionIcon={unlinking ? 'spinner' : LinkBreakIcon}
               />
             </div>
 
@@ -193,8 +192,8 @@ export function IntegrationsSettingsSectionContent() {
             <div className="p-4 rounded-sm bg-secondary/50 border border-border">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-2 rounded-sm bg-[#0088cc]/10">
-                  <TelegramLogo
-                    className="size-5 text-[#0088cc]"
+                  <TelegramLogoIcon
+                    className="size-icon-base text-[#0088cc]"
                     weight="fill"
                   />
                 </div>
@@ -212,7 +211,7 @@ export function IntegrationsSettingsSectionContent() {
                 value={t('integrations.telegram.linkButton')}
                 onClick={handleOpenTelegram}
                 disabled={!linkInfo?.deep_link}
-                icon={<ArrowSquareOut className="size-icon-xs" weight="bold" />}
+                actionIcon={ArrowSquareUpRightIcon}
               />
             </div>
 

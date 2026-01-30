@@ -186,11 +186,11 @@ impl TelegramService {
             escape_html(&task.title)
         );
 
-        if telegram_config.include_llm_summary {
-            if let Some(summary) = llm_summary {
-                message.push_str("\n\n<b>Summary:</b>\n");
-                message.push_str(&escape_html(summary));
-            }
+        if telegram_config.include_llm_summary
+            && let Some(summary) = llm_summary
+        {
+            message.push_str("\n\n<b>Summary:</b>\n");
+            message.push_str(&escape_html(summary));
         }
 
         self.send_message(chat_id, &message).await
@@ -472,14 +472,14 @@ To link your account, use the link from the web interface."#;
     async fn cmd_project(&self, args: &str, chat_id: i64) -> Result<UpdateResult, TelegramError> {
         if args.is_empty() {
             // Show current active project
-            if let Some(project_id) = self.active_projects.get(&chat_id).map(|r| *r) {
-                if let Some(project) = Project::find_by_id(&self.pool, project_id).await? {
-                    return Ok(UpdateResult::Response(format!(
-                        "Active project: <b>{}</b>\n<code>{}</code>",
-                        escape_html(&project.name),
-                        project.id
-                    )));
-                }
+            if let Some(project_id) = self.active_projects.get(&chat_id).map(|r| *r)
+                && let Some(project) = Project::find_by_id(&self.pool, project_id).await?
+            {
+                return Ok(UpdateResult::Response(format!(
+                    "Active project: <b>{}</b>\n<code>{}</code>",
+                    escape_html(&project.name),
+                    project.id
+                )));
             }
             return Ok(UpdateResult::Response(
                 "No active project set. Use /project <id> to set one.".to_string(),
@@ -583,10 +583,10 @@ To link your account, use the link from the web interface."#;
             task.id
         );
 
-        if let Some(desc) = &task.description {
-            if !desc.is_empty() {
-                message.push_str(&format!("\n\n<b>Description:</b>\n{}", escape_html(desc)));
-            }
+        if let Some(desc) = &task.description
+            && !desc.is_empty()
+        {
+            message.push_str(&format!("\n\n<b>Description:</b>\n{}", escape_html(desc)));
         }
 
         Ok(UpdateResult::Response(message))
