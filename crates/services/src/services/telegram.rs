@@ -706,12 +706,54 @@ fn parse_uuid(s: &str) -> Result<Uuid, TelegramError> {
 mod tests {
     use super::*;
 
+    // ========================================================================
+    // HTML Escaping Tests
+    // ========================================================================
+
     #[test]
     fn test_escape_html() {
         assert_eq!(escape_html("<script>"), "&lt;script&gt;");
         assert_eq!(escape_html("a & b"), "a &amp; b");
         assert_eq!(escape_html("normal text"), "normal text");
     }
+
+    #[test]
+    fn test_escape_html_all_special_chars() {
+        assert_eq!(escape_html("<"), "&lt;");
+        assert_eq!(escape_html(">"), "&gt;");
+        assert_eq!(escape_html("&"), "&amp;");
+        assert_eq!(escape_html("<>&"), "&lt;&gt;&amp;");
+    }
+
+    #[test]
+    fn test_escape_html_multiple_occurrences() {
+        assert_eq!(escape_html("<<>>"), "&lt;&lt;&gt;&gt;");
+        assert_eq!(escape_html("a && b && c"), "a &amp;&amp; b &amp;&amp; c");
+    }
+
+    #[test]
+    fn test_escape_html_mixed_content() {
+        assert_eq!(
+            escape_html("<b>Hello</b> & <i>World</i>"),
+            "&lt;b&gt;Hello&lt;/b&gt; &amp; &lt;i&gt;World&lt;/i&gt;"
+        );
+    }
+
+    #[test]
+    fn test_escape_html_empty_string() {
+        assert_eq!(escape_html(""), "");
+    }
+
+    #[test]
+    fn test_escape_html_preserves_other_chars() {
+        assert_eq!(escape_html("Hello, World!"), "Hello, World!");
+        assert_eq!(escape_html("123 + 456 = 579"), "123 + 456 = 579");
+        assert_eq!(escape_html("emoji: 🎉"), "emoji: 🎉");
+    }
+
+    // ========================================================================
+    // Link Token Expiry Tests
+    // ========================================================================
 
     #[test]
     fn test_link_token_expiry() {
@@ -726,5 +768,212 @@ mod tests {
             created_at: Utc::now() - chrono::Duration::minutes(20),
         };
         assert!(expired_token.is_expired());
+    }
+
+    #[test]
+    fn test_link_token_exactly_at_expiry_boundary() {
+        // Token at exactly 15 minutes should not be expired yet
+        let token_at_boundary = LinkToken {
+            token: "test".to_string(),
+            created_at: Utc::now() - chrono::Duration::minutes(15),
+        };
+        // At exactly 15 minutes, now > expiry is false, so not expired
+        assert!(!token_at_boundary.is_expired());
+
+        // Token at 15 minutes + 1 second should be expired
+        let token_past_boundary = LinkToken {
+            token: "test".to_string(),
+            created_at: Utc::now() - chrono::Duration::minutes(15) - chrono::Duration::seconds(1),
+        };
+        assert!(token_past_boundary.is_expired());
+    }
+
+    #[test]
+    fn test_link_token_just_created() {
+        let token = LinkToken {
+            token: "fresh".to_string(),
+            created_at: Utc::now(),
+        };
+        assert!(!token.is_expired());
+    }
+
+    #[test]
+    fn test_link_token_14_minutes_old() {
+        let token = LinkToken {
+            token: "test".to_string(),
+            created_at: Utc::now() - chrono::Duration::minutes(14),
+        };
+        assert!(!token.is_expired());
+    }
+
+    // ========================================================================
+    // UUID Parsing Tests
+    // ========================================================================
+
+    #[test]
+    fn test_parse_uuid_valid() {
+        let uuid_str = "550e8400-e29b-41d4-a716-446655440000";
+        let result = parse_uuid(uuid_str);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().to_string(), uuid_str);
+    }
+
+    #[test]
+    fn test_parse_uuid_with_whitespace() {
+        let uuid_str = "  550e8400-e29b-41d4-a716-446655440000  ";
+        let result = parse_uuid(uuid_str);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_parse_uuid_invalid() {
+        let invalid = "not-a-uuid";
+        let result = parse_uuid(invalid);
+        assert!(result.is_err());
+        match result {
+            Err(TelegramError::InvalidCommand(msg)) => {
+                assert!(msg.contains("Invalid ID format"));
+            }
+            _ => panic!("Expected InvalidCommand error"),
+        }
+    }
+
+    #[test]
+    fn test_parse_uuid_empty() {
+        let result = parse_uuid("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_uuid_partial() {
+        let result = parse_uuid("550e8400-e29b");
+        assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // TelegramError Display Tests
+    // ========================================================================
+
+    #[test]
+    fn test_telegram_error_display() {
+        assert_eq!(
+            TelegramError::NotConfigured.to_string(),
+            "Bot token not configured"
+        );
+        assert_eq!(
+            TelegramError::NotLinked.to_string(),
+            "Account not linked"
+        );
+        assert_eq!(
+            TelegramError::InvalidLinkToken.to_string(),
+            "Invalid link token"
+        );
+        assert_eq!(
+            TelegramError::LinkTokenExpired.to_string(),
+            "Link token expired"
+        );
+        assert_eq!(
+            TelegramError::NoActiveProject.to_string(),
+            "No active project set. Use /project <id> to set one."
+        );
+    }
+
+    #[test]
+    fn test_telegram_error_project_not_found() {
+        let id = Uuid::new_v4();
+        let error = TelegramError::ProjectNotFound(id);
+        assert!(error.to_string().contains(&id.to_string()));
+    }
+
+    #[test]
+    fn test_telegram_error_task_not_found() {
+        let id = Uuid::new_v4();
+        let error = TelegramError::TaskNotFound(id);
+        assert!(error.to_string().contains(&id.to_string()));
+    }
+
+    #[test]
+    fn test_telegram_error_invalid_command() {
+        let error = TelegramError::InvalidCommand("test error".to_string());
+        assert_eq!(error.to_string(), "Invalid command: test error");
+    }
+
+    #[test]
+    fn test_telegram_error_api() {
+        let error = TelegramError::Api("connection failed".to_string());
+        assert_eq!(error.to_string(), "Telegram API error: connection failed");
+    }
+
+    // ========================================================================
+    // UpdateResult Tests
+    // ========================================================================
+
+    #[test]
+    fn test_update_result_response() {
+        let result = UpdateResult::Response("Hello".to_string());
+        match result {
+            UpdateResult::Response(msg) => assert_eq!(msg, "Hello"),
+            _ => panic!("Expected Response variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_result_no_response() {
+        let result = UpdateResult::NoResponse;
+        match result {
+            UpdateResult::NoResponse => {}
+            _ => panic!("Expected NoResponse variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_result_link_completed() {
+        let result = UpdateResult::LinkCompleted {
+            chat_id: 12345,
+            user_id: 67890,
+            username: Some("testuser".to_string()),
+        };
+        match result {
+            UpdateResult::LinkCompleted {
+                chat_id,
+                user_id,
+                username,
+            } => {
+                assert_eq!(chat_id, 12345);
+                assert_eq!(user_id, 67890);
+                assert_eq!(username, Some("testuser".to_string()));
+            }
+            _ => panic!("Expected LinkCompleted variant"),
+        }
+    }
+
+    #[test]
+    fn test_update_result_link_completed_no_username() {
+        let result = UpdateResult::LinkCompleted {
+            chat_id: 12345,
+            user_id: 67890,
+            username: None,
+        };
+        match result {
+            UpdateResult::LinkCompleted { username, .. } => {
+                assert!(username.is_none());
+            }
+            _ => panic!("Expected LinkCompleted variant"),
+        }
+    }
+
+    // ========================================================================
+    // TelegramConfig Default Tests
+    // ========================================================================
+
+    #[test]
+    fn test_telegram_config_default() {
+        let config = TelegramConfig::default();
+        assert!(config.chat_id.is_none());
+        assert!(config.user_id.is_none());
+        assert!(config.username.is_none());
+        assert!(!config.notifications_enabled);
+        assert!(!config.notify_on_task_done);
+        assert!(!config.include_llm_summary);
     }
 }
