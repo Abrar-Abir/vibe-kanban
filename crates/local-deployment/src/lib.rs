@@ -20,6 +20,7 @@ use services::services::{
     queued_message::QueuedMessageService,
     remote_client::{RemoteClient, RemoteClientError},
     repo::RepoService,
+    telegram::TelegramService,
     worktree_manager::WorktreeManager,
 };
 use tokio::sync::RwLock;
@@ -56,6 +57,7 @@ pub struct LocalDeployment {
     auth_context: AuthContext,
     oauth_handoffs: Arc<RwLock<HashMap<Uuid, PendingHandoff>>>,
     pty: PtyService,
+    telegram: Option<TelegramService>,
 }
 
 #[derive(Debug, Clone)]
@@ -179,6 +181,7 @@ impl Deployment for LocalDeployment {
             analytics_ctx,
             approvals.clone(),
             queued_message_service.clone(),
+            telegram.clone(),
         )
         .await;
 
@@ -187,6 +190,14 @@ impl Deployment for LocalDeployment {
         let file_search_cache = Arc::new(FileSearchCache::new());
 
         let pty = PtyService::new();
+
+        // Create Telegram service if bot token is configured
+        let telegram = {
+            let cfg = config.read().await;
+            let bot_token = cfg.telegram.bot_token.clone();
+            drop(cfg);
+            bot_token.map(|token| TelegramService::new(Some(token), config.clone(), db.pool.clone()))
+        };
 
         let deployment = Self {
             config,
@@ -207,6 +218,7 @@ impl Deployment for LocalDeployment {
             auth_context,
             oauth_handoffs,
             pty,
+            telegram,
         };
 
         Ok(deployment)
@@ -266,6 +278,10 @@ impl Deployment for LocalDeployment {
 
     fn queued_message_service(&self) -> &QueuedMessageService {
         &self.queued_message_service
+    }
+
+    fn telegram_service(&self) -> Option<&TelegramService> {
+        self.telegram.as_ref()
     }
 
     fn auth_context(&self) -> &AuthContext {

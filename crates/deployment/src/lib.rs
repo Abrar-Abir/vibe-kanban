@@ -31,6 +31,7 @@ use services::services::{
     project::ProjectService,
     queued_message::QueuedMessageService,
     repo::RepoService,
+    telegram::TelegramService,
     worktree_manager::WorktreeError,
 };
 use sqlx::Error as SqlxError;
@@ -107,6 +108,8 @@ pub trait Deployment: Clone + Send + Sync + 'static {
     fn approvals(&self) -> &Approvals;
 
     fn queued_message_service(&self) -> &QueuedMessageService;
+
+    fn telegram_service(&self) -> Option<&TelegramService>;
 
     fn auth_context(&self) -> &AuthContext;
 

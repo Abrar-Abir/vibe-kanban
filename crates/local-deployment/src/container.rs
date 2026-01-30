@@ -49,6 +49,7 @@ use services::services::{
     image::ImageService,
     notification::NotificationService,
     queued_message::QueuedMessageService,
+    telegram::TelegramService,
     workspace_manager::{RepoWorkspaceInput, WorkspaceManager},
 };
 use tokio::{sync::RwLock, task::JoinHandle};
@@ -79,6 +80,7 @@ pub struct LocalContainerService {
     approvals: Approvals,
     queued_message_service: QueuedMessageService,
     notification_service: NotificationService,
+    telegram_service: Option<TelegramService>,
 }
 
 impl LocalContainerService {
@@ -92,6 +94,7 @@ impl LocalContainerService {
         analytics: Option<AnalyticsContext>,
         approvals: Approvals,
         queued_message_service: QueuedMessageService,
+        telegram_service: Option<TelegramService>,
     ) -> Self {
         let child_store = Arc::new(RwLock::new(HashMap::new()));
         let cancellation_tokens = Arc::new(RwLock::new(HashMap::new()));
@@ -113,6 +116,7 @@ impl LocalContainerService {
             approvals,
             queued_message_service,
             notification_service,
+            telegram_service,
         };
 
         container.spawn_workspace_cleanup();
@@ -947,6 +951,10 @@ impl ContainerService for LocalContainerService {
 
     fn notification_service(&self) -> &NotificationService {
         &self.notification_service
+    }
+
+    fn telegram_service(&self) -> Option<&TelegramService> {
+        self.telegram_service.as_ref()
     }
 
     async fn store_db_stream_handle(&self, id: Uuid, handle: JoinHandle<()>) {

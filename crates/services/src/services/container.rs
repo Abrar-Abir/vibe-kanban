@@ -53,8 +53,8 @@ use utils::{
 use uuid::Uuid;
 
 use crate::services::{
-    notification::NotificationService, workspace_manager::WorkspaceError as WorkspaceManagerError,
-    worktree_manager::WorktreeError,
+    notification::NotificationService, telegram::TelegramService,
+    workspace_manager::WorkspaceError as WorkspaceManagerError, worktree_manager::WorktreeError,
 };
 pub type ContainerRef = String;
 
@@ -93,6 +93,8 @@ pub trait ContainerService {
     fn git(&self) -> &GitService;
 
     fn notification_service(&self) -> &NotificationService;
+
+    fn telegram_service(&self) -> Option<&TelegramService>;
 
     fn workspace_to_current_dir(&self, workspace: &Workspace) -> PathBuf;
 
@@ -251,6 +253,25 @@ pub trait ContainerService {
             }
         };
         self.notification_service().notify(&title, &message).await;
+
+        // Send Telegram notification if configured
+        if let Some(telegram_service) = self.telegram_service() {
+            let summary = CodingAgentTurn::find_by_execution_process_id(
+                &self.db().pool,
+                ctx.execution_process.id,
+            )
+            .await
+            .ok()
+            .flatten()
+            .and_then(|t| t.summary);
+
+            if let Err(e) = telegram_service
+                .send_task_notification(&ctx.task, summary.as_deref())
+                .await
+            {
+                tracing::warn!("Failed to send Telegram notification: {e}");
+            }
+        }
     }
 
     /// Cleanup executions marked as running in the db, call at startup
