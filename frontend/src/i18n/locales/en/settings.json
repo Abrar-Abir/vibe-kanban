@@ -23,7 +23,9 @@
         "mcp": "MCP Servers",
         "mcpDesc": "Model Context Protocol servers",
         "organizations": "Organization Settings",
-        "organizationsDesc": "Manage organization members and permissions"
+        "organizationsDesc": "Manage organization members and permissions",
+        "integrations": "Integrations",
+        "integrationsDesc": "Connect external services and notifications"
       }
     },
     "general": {
@@ -472,6 +474,35 @@
     }
   },
   "integrations": {
+    "loading": "Loading integrations...",
+    "telegram": {
+      "title": "Telegram Notifications",
+      "description": "Receive task completion notifications via Telegram.",
+      "loadError": "Failed to load Telegram status.",
+      "unlinkError": "Failed to unlink Telegram account.",
+      "notConfigured": "Telegram bot is not configured. Contact your administrator to enable Telegram notifications.",
+      "linkedAccount": "Telegram Account",
+      "connected": "Connected",
+      "unlink": "Unlink",
+      "notLinked": "Not Connected",
+      "linkDescription": "Link your Telegram account to receive notifications.",
+      "linkButton": "Connect Telegram",
+      "linkInstructions": "Click the button above to open Telegram and complete the linking process.",
+      "notificationSettings": "Notification Settings",
+      "notificationsEnabled": {
+        "label": "Notifications Enabled",
+        "description": "Receive notifications via Telegram."
+      },
+      "notifyOnTaskDone": {
+        "label": "Notify on Task Completion",
+        "description": "Get notified when a task execution finishes."
+      },
+      "includeLlmSummary": {
+        "label": "Include AI Summary",
+        "description": "Include an AI-generated summary in task completion notifications."
+      },
+      "settingsNote": "Notification settings can be configured via Telegram bot commands."
+    },
     "github": {
       "cliSetup": {
         "title": "GitHub CLI Setup",

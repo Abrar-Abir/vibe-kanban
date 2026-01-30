@@ -8,6 +8,7 @@ import {
   BuildingsIcon,
   CpuIcon,
   PlugIcon,
+  PlugsConnectedIcon,
   CaretLeftIcon,
   XIcon,
 } from '@phosphor-icons/react';
@@ -34,6 +35,7 @@ const SETTINGS_SECTIONS: {
   { id: 'organizations', icon: BuildingsIcon },
   { id: 'agents', icon: CpuIcon },
   { id: 'mcp', icon: PlugIcon },
+  { id: 'integrations', icon: PlugsConnectedIcon },
 ];
 
 export interface SettingsDialogProps {

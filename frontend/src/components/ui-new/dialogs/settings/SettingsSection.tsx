@@ -7,6 +7,7 @@ import { ReposSettingsSectionContent } from './ReposSettingsSection';
 import { OrganizationsSettingsSectionContent } from './OrganizationsSettingsSection';
 import { AgentsSettingsSectionContent } from './AgentsSettingsSection';
 import { McpSettingsSectionContent } from './McpSettingsSection';
+import { IntegrationsSettingsSectionContent } from './IntegrationsSettingsSection';
 
 export type SettingsSectionType =
   | 'general'
@@ -14,7 +15,8 @@ export type SettingsSectionType =
   | 'repos'
   | 'organizations'
   | 'agents'
-  | 'mcp';
+  | 'mcp'
+  | 'integrations';
 
 interface SettingsSectionProps {
   type: SettingsSectionType;
@@ -38,6 +40,8 @@ export function SettingsSection({ type, onClose }: SettingsSectionProps) {
         return <AgentsSettingsSectionContent />;
       case 'mcp':
         return <McpSettingsSectionContent />;
+      case 'integrations':
+        return <IntegrationsSettingsSectionContent />;
       default:
         return <GeneralSettingsSectionContent />;
     }
