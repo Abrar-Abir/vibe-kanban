@@ -52,6 +52,25 @@ export function IntegrationsSettingsSectionContent() {
     fetchStatus();
   }, [fetchStatus]);
 
+  // Poll for status changes while waiting for link completion
+  useEffect(() => {
+    if (!linkInfo?.token || status?.linked) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const statusResponse = await telegramApi.getStatus();
+        if (statusResponse.linked) {
+          setStatus(statusResponse);
+          setLinkInfo(null);
+        }
+      } catch (err) {
+        console.error('Failed to poll Telegram status:', err);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [linkInfo?.token, status?.linked]);
+
   const handleUnlink = async () => {
     if (!status?.linked) return;
 
