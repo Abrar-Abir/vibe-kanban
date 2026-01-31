@@ -169,7 +169,15 @@ impl Deployment for LocalDeployment {
         // Create Telegram service if bot token is configured
         let telegram = {
             let bot_token = std::env::var("TELEGRAM_BOT_TOKEN").ok();
-            bot_token.map(|token| TelegramService::new(Some(token), config.clone(), db.pool.clone()))
+            let bot_username = std::env::var("TELEGRAM_BOT_USERNAME").ok();
+            bot_token.map(|token| {
+                let service = TelegramService::new(Some(token), config.clone(), db.pool.clone());
+                if let Some(username) = bot_username {
+                    service.with_bot_username(username)
+                } else {
+                    service
+                }
+            })
         };
 
         // We need to make analytics accessible to the ContainerService

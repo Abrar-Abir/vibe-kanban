@@ -85,18 +85,11 @@ pub fn webhook_router() -> Router<DeploymentImpl> {
     Router::new().route("/telegram/webhook", post(webhook))
 }
 
-/// Create a TelegramService instance from the deployment.
-fn create_telegram_service(deployment: &DeploymentImpl) -> TelegramService {
-    let bot_token = std::env::var("TELEGRAM_BOT_TOKEN").ok();
-    let bot_username = std::env::var("TELEGRAM_BOT_USERNAME").ok();
-
-    let service = TelegramService::new(bot_token, deployment.config().clone(), deployment.db().pool.clone());
-
-    if let Some(username) = bot_username {
-        service.with_bot_username(username)
-    } else {
-        service
-    }
+/// Get the shared TelegramService from the deployment, or return an error.
+fn get_telegram_service(deployment: &DeploymentImpl) -> Result<&TelegramService, ApiError> {
+    deployment
+        .telegram_service()
+        .ok_or_else(|| ApiError::BadRequest("Telegram bot is not configured".to_string()))
 }
 
 /// POST /api/telegram/webhook
@@ -107,12 +100,10 @@ async fn webhook(
     State(deployment): State<DeploymentImpl>,
     Json(update): Json<Update>,
 ) -> Result<StatusCode, ApiError> {
-    let service = create_telegram_service(&deployment);
-
-    if !service.is_configured() {
+    let Some(service) = deployment.telegram_service() else {
         tracing::warn!("Telegram webhook received but bot is not configured");
         return Ok(StatusCode::OK);
-    }
+    };
 
     match service.handle_update(update).await {
         Ok(UpdateResult::Response(text)) => {
@@ -163,15 +154,13 @@ async fn webhook(
 async fn get_link(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<TelegramLinkInfo>>, ApiError> {
-    let service = create_telegram_service(&deployment);
-
-    if !service.is_configured() {
+    let Some(service) = deployment.telegram_service() else {
         return Ok(ResponseJson(ApiResponse::success(TelegramLinkInfo {
             token: String::new(),
             deep_link: String::new(),
             bot_configured: false,
         })));
-    }
+    };
 
     let (token, deep_link) = service
         .generate_link_token()
@@ -188,7 +177,7 @@ async fn get_link(
 ///
 /// Unlink the Telegram account.
 async fn unlink(State(deployment): State<DeploymentImpl>) -> Result<StatusCode, ApiError> {
-    let service = create_telegram_service(&deployment);
+    let service = get_telegram_service(&deployment)?;
 
     service
         .unlink()
@@ -210,11 +199,14 @@ async fn unlink(State(deployment): State<DeploymentImpl>) -> Result<StatusCode, 
 async fn get_status(
     State(deployment): State<DeploymentImpl>,
 ) -> Result<ResponseJson<ApiResponse<TelegramStatusResponse>>, ApiError> {
-    let service = create_telegram_service(&deployment);
-    let status = service.get_link_status().await;
+    let (status, is_configured) = if let Some(service) = deployment.telegram_service() {
+        (service.get_link_status().await, true)
+    } else {
+        (TelegramConfig::default(), false)
+    };
 
     let mut response = TelegramStatusResponse::from(status);
-    response.bot_configured = service.is_configured();
+    response.bot_configured = is_configured;
 
     Ok(ResponseJson(ApiResponse::success(response)))
 }
