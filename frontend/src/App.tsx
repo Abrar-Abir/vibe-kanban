@@ -14,6 +14,7 @@ import { usePreviousPath } from '@/hooks/usePreviousPath';
 import {
   AgentSettings,
   GeneralSettings,
+  IntegrationsSettings,
   McpSettings,
   OrganizationSettings,
   ProjectSettings,
@@ -166,6 +167,7 @@ function AppContent() {
                 />
                 <Route path="agents" element={<AgentSettings />} />
                 <Route path="mcp" element={<McpSettings />} />
+                <Route path="integrations" element={<IntegrationsSettings />} />
               </Route>
               <Route
                 path="/mcp-servers"

@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Building2,
   GitBranch,
+  PlugZap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,10 @@ const settingsNavigation = [
   {
     path: 'mcp',
     icon: Server,
+  },
+  {
+    path: 'integrations',
+    icon: PlugZap,
   },
 ];
 
