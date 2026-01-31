@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TelegramLogoIcon, LinkBreakIcon, ArrowSquareUpRightIcon } from '@phosphor-icons/react';
+import { TelegramLogoIcon, LinkBreakIcon, ArrowSquareUpRightIcon, Copy, Check } from '@phosphor-icons/react';
 
 import { telegramApi } from '@/lib/api';
 import { SettingsCard, SettingsCheckbox } from './SettingsComponents';
@@ -28,6 +28,7 @@ export function IntegrationsSettingsSectionContent() {
   const [loading, setLoading] = useState(true);
   const [unlinking, setUnlinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -72,6 +73,14 @@ export function IntegrationsSettingsSectionContent() {
   const handleOpenTelegram = () => {
     if (linkInfo?.deep_link) {
       window.open(linkInfo.deep_link, '_blank');
+    }
+  };
+
+  const handleCopyCommand = async () => {
+    if (linkInfo?.token) {
+      await navigator.clipboard.writeText(`/start ${linkInfo.token}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -219,6 +228,37 @@ export function IntegrationsSettingsSectionContent() {
               <p className="text-xs text-low">
                 {t('integrations.telegram.linkInstructions')}
               </p>
+            )}
+
+            {linkInfo?.token && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-low mb-2">
+                  {t('integrations.telegram.manualLinkTitle')}
+                </p>
+                <ol className="text-xs text-low list-decimal list-inside space-y-1 mb-3">
+                  <li>{t('integrations.telegram.manualStep1', { botUsername: 'kanban_vibe_bot' })}</li>
+                  <li>{t('integrations.telegram.manualStep2')}</li>
+                </ol>
+                <div className="flex items-center gap-2 bg-secondary/50 rounded-sm p-2">
+                  <code className="text-xs text-high flex-1 font-mono truncate">
+                    /start {linkInfo.token}
+                  </code>
+                  <button
+                    onClick={handleCopyCommand}
+                    className="p-1 hover:bg-secondary rounded-sm transition-colors"
+                    title={copied ? t('integrations.telegram.copied') : t('integrations.telegram.copyCommand')}
+                  >
+                    {copied ? (
+                      <Check className="size-4 text-green-500" weight="bold" />
+                    ) : (
+                      <Copy className="size-4 text-low" />
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs text-low mt-2">
+                  {t('integrations.telegram.tokenExpiry')}
+                </p>
+              </div>
             )}
           </div>
         )}

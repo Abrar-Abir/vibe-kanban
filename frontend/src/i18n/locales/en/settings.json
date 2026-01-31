@@ -501,7 +501,13 @@
         "label": "Include AI Summary",
         "description": "Include an AI-generated summary in task completion notifications."
       },
-      "settingsNote": "Notification settings can be configured via Telegram bot commands."
+      "settingsNote": "Notification settings can be configured via Telegram bot commands.",
+      "manualLinkTitle": "Or link manually:",
+      "manualStep1": "Open Telegram and search for @{{botUsername}}",
+      "manualStep2": "Send this command to the bot:",
+      "tokenExpiry": "Token expires in 15 minutes",
+      "copyCommand": "Copy command",
+      "copied": "Copied!"
     },
     "github": {
       "cliSetup": {
