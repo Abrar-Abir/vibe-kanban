@@ -291,6 +291,30 @@ impl TelegramService {
         config.telegram.clone()
     }
 
+    /// Update Telegram notification settings
+    ///
+    /// Allows updating individual settings without affecting others.
+    pub async fn update_settings(
+        &self,
+        notifications_enabled: Option<bool>,
+        notify_on_task_done: Option<bool>,
+        include_llm_summary: Option<bool>,
+    ) -> Result<TelegramConfig, TelegramError> {
+        let mut config = self.config.write().await;
+
+        if let Some(v) = notifications_enabled {
+            config.telegram.notifications_enabled = v;
+        }
+        if let Some(v) = notify_on_task_done {
+            config.telegram.notify_on_task_done = v;
+        }
+        if let Some(v) = include_llm_summary {
+            config.telegram.include_llm_summary = v;
+        }
+
+        Ok(config.telegram.clone())
+    }
+
     /// Clean up expired link tokens
     fn cleanup_expired_tokens(&self) {
         self.pending_links.retain(|_, token| !token.is_expired());

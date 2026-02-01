@@ -27,6 +27,7 @@ export function IntegrationsSettingsSectionContent() {
   const [linkInfo, setLinkInfo] = useState<TelegramLinkInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [unlinking, setUnlinking] = useState(false);
+  const [updatingSetting, setUpdatingSetting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -100,6 +101,24 @@ export function IntegrationsSettingsSectionContent() {
       await navigator.clipboard.writeText(`/start ${linkInfo.token}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleSettingChange = async (
+    setting: 'notifications_enabled' | 'notify_on_task_done' | 'include_llm_summary',
+    value: boolean
+  ) => {
+    setUpdatingSetting(setting);
+    setError(null);
+
+    try {
+      const updated = await telegramApi.updateSettings({ [setting]: value });
+      setStatus(updated);
+    } catch (err) {
+      setError(t('integrations.telegram.updateError'));
+      console.error('Failed to update Telegram setting:', err);
+    } finally {
+      setUpdatingSetting(null);
     }
   };
 
@@ -179,8 +198,8 @@ export function IntegrationsSettingsSectionContent() {
                   'integrations.telegram.notificationsEnabled.description'
                 )}
                 checked={status.notifications_enabled}
-                onChange={() => {}}
-                disabled={true}
+                onChange={(checked) => handleSettingChange('notifications_enabled', checked)}
+                disabled={updatingSetting === 'notifications_enabled'}
               />
 
               <SettingsCheckbox
@@ -192,8 +211,8 @@ export function IntegrationsSettingsSectionContent() {
                   'integrations.telegram.notifyOnTaskDone.description'
                 )}
                 checked={status.notify_on_task_done}
-                onChange={() => {}}
-                disabled={true}
+                onChange={(checked) => handleSettingChange('notify_on_task_done', checked)}
+                disabled={updatingSetting === 'notify_on_task_done' || !status.notifications_enabled}
               />
 
               <SettingsCheckbox
@@ -205,13 +224,9 @@ export function IntegrationsSettingsSectionContent() {
                   'integrations.telegram.includeLlmSummary.description'
                 )}
                 checked={status.include_llm_summary}
-                onChange={() => {}}
-                disabled={true}
+                onChange={(checked) => handleSettingChange('include_llm_summary', checked)}
+                disabled={updatingSetting === 'include_llm_summary' || !status.notifications_enabled}
               />
-
-              <p className="text-xs text-low mt-2">
-                {t('integrations.telegram.settingsNote')}
-              </p>
             </div>
           </div>
         ) : (

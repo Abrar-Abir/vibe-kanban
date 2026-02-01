@@ -1387,4 +1387,19 @@ export const telegramApi = {
     const response = await makeRequest('/api/telegram/status');
     return handleApiResponse<TelegramStatusResponse>(response);
   },
+
+  /**
+   * Update Telegram notification settings
+   */
+  updateSettings: async (settings: {
+    notifications_enabled?: boolean;
+    notify_on_task_done?: boolean;
+    include_llm_summary?: boolean;
+  }): Promise<TelegramStatusResponse> => {
+    const response = await makeRequest('/api/telegram/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
+    return handleApiResponse<TelegramStatusResponse>(response);
+  },
 };

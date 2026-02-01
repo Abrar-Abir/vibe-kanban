@@ -165,6 +165,7 @@ fn generate_types_content() -> String {
         services::services::config::TelegramConfig::decl(),
         server::routes::telegram::TelegramLinkInfo::decl(),
         server::routes::telegram::TelegramStatusResponse::decl(),
+        server::routes::telegram::UpdateTelegramSettingsRequest::decl(),
         git::GitBranch::decl(),
         services::services::queued_message::QueuedMessage::decl(),
         services::services::queued_message::QueueStatus::decl(),

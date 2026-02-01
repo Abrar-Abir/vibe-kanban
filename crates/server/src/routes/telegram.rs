@@ -5,17 +5,18 @@
 //! - GET /api/telegram/link - Get deep link for account linking
 //! - DELETE /api/telegram/unlink - Unlink Telegram account
 //! - GET /api/telegram/status - Check link status
+//! - PATCH /api/telegram/settings - Update notification settings
 
 use axum::{
     Router,
     extract::{Json, State},
     http::StatusCode,
     response::Json as ResponseJson,
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
 };
 use deployment::Deployment;
 use frankenstein::objects::Update;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use services::services::{
     config::{TelegramConfig, save_config_to_file},
     telegram::{TelegramError, TelegramService, UpdateResult},
@@ -68,6 +69,18 @@ impl From<TelegramConfig> for TelegramStatusResponse {
     }
 }
 
+/// Request to update Telegram notification settings
+#[derive(Debug, Deserialize, TS)]
+#[ts(export)]
+pub struct UpdateTelegramSettingsRequest {
+    /// Whether to enable notifications (master switch)
+    pub notifications_enabled: Option<bool>,
+    /// Whether to notify on task completion
+    pub notify_on_task_done: Option<bool>,
+    /// Whether to include LLM summaries in notifications
+    pub include_llm_summary: Option<bool>,
+}
+
 /// Create the Telegram router.
 ///
 /// Note: The webhook endpoint should be registered separately without origin validation.
@@ -76,6 +89,7 @@ pub fn router(_deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/telegram/link", get(get_link))
         .route("/telegram/unlink", delete(unlink))
         .route("/telegram/status", get(get_status))
+        .route("/telegram/settings", patch(update_settings))
 }
 
 /// Create a router for the webhook endpoint that bypasses origin validation.
@@ -207,6 +221,36 @@ async fn get_status(
 
     let mut response = TelegramStatusResponse::from(status);
     response.bot_configured = is_configured;
+
+    Ok(ResponseJson(ApiResponse::success(response)))
+}
+
+/// PATCH /api/telegram/settings
+///
+/// Update Telegram notification settings.
+async fn update_settings(
+    State(deployment): State<DeploymentImpl>,
+    Json(request): Json<UpdateTelegramSettingsRequest>,
+) -> Result<ResponseJson<ApiResponse<TelegramStatusResponse>>, ApiError> {
+    let service = get_telegram_service(&deployment)?;
+
+    let updated = service
+        .update_settings(
+            request.notifications_enabled,
+            request.notify_on_task_done,
+            request.include_llm_summary,
+        )
+        .await
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
+
+    // Save config to disk
+    let config = deployment.config().read().await.clone();
+    if let Err(e) = save_config_to_file(&config, &config_path()).await {
+        tracing::error!("Failed to save Telegram settings: {}", e);
+    }
+
+    let mut response = TelegramStatusResponse::from(updated);
+    response.bot_configured = true;
 
     Ok(ResponseJson(ApiResponse::success(response)))
 }

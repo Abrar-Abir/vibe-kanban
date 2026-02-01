@@ -426,6 +426,20 @@ include_llm_summary: boolean,
  */
 bot_configured: boolean, };
 
+export type UpdateTelegramSettingsRequest = { 
+/**
+ * Whether to enable notifications (master switch)
+ */
+notifications_enabled: boolean | null, 
+/**
+ * Whether to notify on task completion
+ */
+notify_on_task_done: boolean | null, 
+/**
+ * Whether to include LLM summaries in notifications
+ */
+include_llm_summary: boolean | null, };
+
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 
 export type QueuedMessage = { 
