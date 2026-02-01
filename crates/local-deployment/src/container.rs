@@ -492,6 +492,9 @@ impl LocalContainerService {
                     ExecutionProcessStatus::Running
                 );
 
+                // Track whether we've already finalized to prevent duplicate notifications
+                let mut already_finalized = false;
+
                 if success || cleanup_done {
                     // Commit changes (if any) and get feedback about whether changes were made
                     let changes_committed = match container.try_commit_changes(&ctx).await {
@@ -530,10 +533,11 @@ impl LocalContainerService {
 
                         // Manually finalize task since we're bypassing normal execution flow
                         container.finalize_task(&ctx).await;
+                        already_finalized = true;
                     }
                 }
 
-                if container.should_finalize(&ctx) {
+                if !already_finalized && container.should_finalize(&ctx) {
                     // Only execute queued messages if the execution succeeded
                     // If it failed or was killed, just clear the queue and finalize
                     let should_execute_queued = !matches!(
