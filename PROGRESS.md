@@ -12,8 +12,9 @@ This document tracks the implementation progress of the Telegram Bot Integration
 | Phase 2: Backend Integration | ✅ Complete | 100% |
 | Phase 3: Frontend Integration | ✅ Complete | 100% |
 | Phase 4: Documentation & Testing | ✅ Complete | 100% |
+| Phase 5: Webhook & Auto-linking | 🔄 In Progress | 90% |
 
-**Overall Progress: 100% Complete**
+**Overall Progress: Phase 5 - Webhook Integration In Progress**
 
 ---
 
@@ -133,25 +134,65 @@ This document tracks the implementation progress of the Telegram Bot Integration
 | `crates/utils/src/config/mod.rs` | Updated to use v9 as current config |
 | `crates/services/src/services/mod.rs` | Exported TelegramService |
 | `crates/services/src/services/task.rs` | Added notification on task completion |
-| `crates/server/src/routes/mod.rs` | Registered telegram routes |
+| `crates/server/src/routes/mod.rs` | Registered telegram routes + webhook_router |
 | `crates/server/src/bin/generate_types.rs` | Added Telegram types |
 | `frontend/src/lib/api.ts` | Added Telegram API methods |
 | `frontend/src/components/dialogs/settings-dialog.tsx` | Added Integrations tab |
 | `shared/types.ts` | Generated Telegram types |
 | `.env.example` | Added Telegram environment variables |
+| `.env` | Added bot token, username, webhook URL |
+| `crates/services/src/services/telegram.rs` | Added webhook handling, token management, `/start` command |
+| `frontend/src/components/ui-new/dialogs/settings/IntegrationsSettingsSection.tsx` | Added manual link UI, copy button, polling |
+| `frontend/src/i18n/locales/en/settings.json` | Added manual linking translations |
 
 ---
 
-## Not Implemented (Out of Scope for Phase 1)
+## Phase 5: Webhook & Auto-linking (In Progress)
 
-The following features from the scope document were deferred:
+### P5-T1: Webhook Handler Implementation ✅
+- Implemented `POST /api/telegram/webhook` endpoint
+- Added separate `webhook_router()` to bypass origin validation
+- Webhook receives and parses Telegram Update objects
 
-1. **Telegram Webhook Handler** - Incoming webhook processing for slash commands
-2. **Slash Commands** (`/start`, `/help`, `/projects`, `/tasks`, `/newtask`, `/message`)
-3. **Project Context Management** - Active project tracking per user
-4. **Auto-linking via `/start` command** - Currently requires manual linking
+### P5-T2: Slash Command Handler (`/start`) ✅
+- `cmd_start()` handles `/start TOKEN` command
+- Validates token against in-memory `pending_links` DashMap
+- Links Telegram chat to user account on valid token
+- Sends confirmation message to user
 
-These features can be implemented in a future phase when webhook infrastructure is set up.
+### P5-T3: Token Generation & Deep Linking ✅
+- `generate_link_token()` creates UUID tokens with 15-min expiry
+- Deep link format: `https://t.me/kanban_vibe_bot?start=TOKEN`
+- Token stored in `pending_links: Arc<DashMap<String, LinkToken>>`
+
+### P5-T4: Fix Token Persistence Bug ✅
+- **Issue:** New TelegramService instance was created per request, losing tokens
+- **Fix:** Changed to use shared instance via `deployment.telegram_service()`
+
+### P5-T5: ngrok Webhook Setup ✅
+- Installed ngrok for local development webhook tunneling
+- Configured tunnel to backend port (3001)
+- Registered webhook with Telegram API
+
+### P5-T6: Manual Linking UI ✅
+- Added fallback UI for Telegram Desktop deep link quirk
+- Copy button for `/start TOKEN` command
+- Visual feedback (checkmark) on copy
+- Instructions and token expiry notice
+- Auto-polling (3s) to detect when account is linked
+
+### P5-T7: Verify End-to-End Flow 🔄
+- [ ] Test manual linking with copy/paste
+- [ ] Verify UI auto-updates after linking
+- [ ] Test deep link on mobile Telegram
+
+---
+
+## Remaining Work
+
+1. **End-to-End Testing** - Verify the complete linking flow works
+2. **Additional Slash Commands** - `/help`, `/projects`, `/tasks` (future)
+3. **Project Context Management** - Active project tracking per user (future)
 
 ---
 

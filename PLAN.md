@@ -12,16 +12,15 @@ Based on scope document: [docs/telegram-bot-integration-scope.md](docs/telegram-
 
 ## Progress Summary
 
-**Status: Phase 1 Complete (Core Implementation)**
-
-All 10 planned tasks across 4 phases have been implemented:
+**Status: Phase 5 In Progress (Webhook & Auto-linking)**
 
 | Phase | Status | Key Deliverables |
 |-------|--------|------------------|
-| Phase 1: Foundation | Complete | frankenstein crate, config v9, TelegramService |
-| Phase 2: Backend Integration | Complete | API routes, task completion notifications |
-| Phase 3: Frontend Integration | Complete | TypeScript types, API methods, Settings UI |
-| Phase 4: Documentation | Complete | Environment variables documented, tests added |
+| Phase 1: Foundation | ✅ Complete | frankenstein crate, config v9, TelegramService |
+| Phase 2: Backend Integration | ✅ Complete | API routes, task completion notifications |
+| Phase 3: Frontend Integration | ✅ Complete | TypeScript types, API methods, Settings UI |
+| Phase 4: Documentation | ✅ Complete | Environment variables documented, tests added |
+| Phase 5: Webhook & Auto-linking | 🔄 In Progress | Webhook handler, `/start` command, manual link UI |
 
 ### What's Working
 - TelegramService can send messages to linked Telegram chats
@@ -29,22 +28,57 @@ All 10 planned tasks across 4 phases have been implemented:
 - API endpoints for status, linking, and unlinking
 - Settings UI with Integrations tab for managing Telegram connection
 - Automatic notifications when tasks are marked as "done"
+- **NEW:** Webhook handler receives Telegram updates
+- **NEW:** `/start TOKEN` command links accounts automatically
+- **NEW:** Deep link generation with 15-min expiring tokens
+- **NEW:** Manual link UI with copy button (fallback for Telegram Desktop)
+- **NEW:** Auto-polling UI to detect when account is linked
 
 ### What's Deferred (Future Work)
-- Telegram webhook handler for incoming messages
-- Slash commands (`/start`, `/help`, `/projects`, `/tasks`, `/newtask`, `/message`)
+- Additional slash commands (`/help`, `/projects`, `/tasks`, `/newtask`, `/message`)
 - Project context management for conversational bot interactions
-- Auto-linking via `/start` command with deep link tokens
 
 ---
 
-## Future Directions
+## Current Dev Setup (ngrok)
 
-### Phase 2: Webhook & Slash Commands
-1. **Webhook Handler** - Implement `POST /api/telegram/webhook` to receive Telegram updates
-2. **Command Parser** - Parse and route incoming slash commands
-3. **Project Context** - Track "active project" per user for contextual commands
-4. **Auto-linking** - Generate deep link tokens for seamless `/start` linking
+The webhook requires a public URL. For local development:
+
+```bash
+# Start ngrok tunnel to backend port
+ngrok http 3001
+
+# Get the public URL
+curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*"'
+
+# Register webhook with Telegram (replace URL)
+curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook?url=https://XXXX.ngrok-free.app/api/telegram/webhook"
+
+# Verify webhook
+curl "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/getWebhookInfo"
+```
+
+**Current ngrok URL:** `https://57fb9c29d77a.ngrok-free.app`
+
+**Note:** ngrok URL changes on restart - must update `.env` and re-register webhook.
+
+---
+
+## Next Steps
+
+### Immediate: Verify End-to-End Flow
+1. Go to Settings → Integrations
+2. Copy `/start TOKEN` command
+3. Send to @kanban_vibe_bot in Telegram
+4. Verify UI auto-updates to "Connected"
+
+### Future Directions
+
+### Phase 6: Additional Slash Commands
+1. **Command Parser** - Route incoming slash commands to handlers
+2. **`/help`** - Show available commands
+3. **`/projects`** - List user's projects
+4. **`/tasks`** - List tasks in active project
 
 ### Phase 3: Enhanced Notifications
 1. **Rich Notifications** - Include LLM summary in task completion messages
@@ -141,6 +175,9 @@ curl -X DELETE http://localhost:3000/api/telegram/unlink
 | No notification received | Chat ID incorrect | Verify chat ID via getUpdates API |
 | "Failed to send message" | Bot blocked by user | Start conversation with bot first |
 | Link fails silently | Invalid chat ID format | Chat ID should be a number (no quotes) |
+| Webhook returns 403 | ngrok tunneling to wrong port | Ensure ngrok targets port 3001 (backend), not 3000 (frontend) |
+| Deep link doesn't work | Telegram Desktop quirk | Use manual copy/paste method instead |
+| Token not found | Tokens are in-memory only | Restart generates new tokens; previous ones are lost |
 
 ---
 
