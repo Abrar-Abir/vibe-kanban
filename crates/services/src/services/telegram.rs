@@ -392,9 +392,16 @@ impl TelegramService {
             };
 
             // Buffer for debouncing
-            let mut buffer = String::new();
             let mut last_update = Instant::now();
             let flush_interval = Duration::from_millis(500);
+
+            // Track seen entries to avoid partial updates
+            let mut seen_entries: HashMap<usize, String> = HashMap::new();
+            let mut last_entry_index: Option<usize> = None;
+
+            // Track message IDs for multi-message support
+            let mut message_ids: Vec<i32> = vec![msg_id];
+            let mut accumulated_content = String::new();
 
             tracing::debug!("Telegram streaming started for execution {}", execution_id);
 
@@ -404,46 +411,79 @@ impl TelegramService {
                     LogMsg::JsonPatch(patch) => {
                         tracing::debug!("Received JsonPatch in Telegram stream");
                         // Extract NormalizedEntry from the patch
-                        if let Some((_, entry)) = extract_normalized_entry_from_patch(&patch) {
+                        if let Some((entry_index, entry)) = extract_normalized_entry_from_patch(&patch) {
                             tracing::debug!("Extracted entry type: {:?}", entry.entry_type);
                             if let Some(formatted) = format_entry(&entry) {
                                 tracing::debug!("Formatted entry: {}", formatted);
-                                if !buffer.is_empty() {
-                                    buffer.push('\n');
-                                }
-                                buffer.push_str(&formatted);
 
-                                // Debounce updates
-                                if last_update.elapsed() >= flush_interval {
-                                    let text = format_stream_message(&task_name, &buffer);
-                                    let edit_params = EditMessageTextParams::builder()
-                                        .chat_id(ChatId::Integer(chat_id))
-                                        .message_id(msg_id)
-                                        .text(&text)
-                                        .parse_mode(ParseMode::Html)
-                                        .build();
+                                // Check if we've seen this entry before
+                                let previous_content = seen_entries.get(&entry_index);
 
-                                    if let Err(e) = api.edit_message_text(&edit_params).await {
-                                        tracing::debug!("Failed to edit stream message: {}", e);
+                                // Determine if entry is complete
+                                let is_complete = formatted.ends_with('\n')
+                                    || formatted.ends_with('.')
+                                    || formatted.ends_with('!')
+                                    || formatted.ends_with('?')
+                                    || matches!(entry.entry_type, NormalizedEntryType::ToolUse { .. });
+
+                                // Also emit if a NEW entry arrives (previous must be done)
+                                let new_entry_arrived = last_entry_index.is_some()
+                                    && last_entry_index != Some(entry_index);
+
+                                // Only add to buffer if content changed AND is complete
+                                let content_changed = previous_content != Some(&formatted);
+
+                                if content_changed && (is_complete || new_entry_arrived) {
+                                    if !accumulated_content.is_empty() {
+                                        accumulated_content.push('\n');
                                     }
-                                    last_update = Instant::now();
+                                    accumulated_content.push_str(&formatted);
+                                    seen_entries.insert(entry_index, formatted);
+                                    last_entry_index = Some(entry_index);
+
+                                    // Debounce updates
+                                    if last_update.elapsed() >= flush_interval {
+                                        send_or_split_message(
+                                            &api,
+                                            chat_id,
+                                            &task_name,
+                                            &accumulated_content,
+                                            &mut message_ids,
+                                        ).await;
+                                        last_update = Instant::now();
+                                    }
                                 }
                             }
                         }
                     }
                     LogMsg::Finished => {
-                        tracing::debug!("Telegram stream finished, buffer length: {}", buffer.len());
-                        // Final update
-                        let text = format_stream_message(&task_name, &buffer) + "\n\n✅ Done";
+                        tracing::debug!("Telegram stream finished, accumulated content length: {}", accumulated_content.len());
+
+                        // Final flush
+                        send_or_split_message(
+                            &api,
+                            chat_id,
+                            &task_name,
+                            &accumulated_content,
+                            &mut message_ids,
+                        ).await;
+
+                        // Append done indicator to LAST message only
+                        let last_msg_id = *message_ids.last().unwrap();
+                        let final_text = format_stream_message(
+                            &task_name,
+                            &format!("{}\n\n✅ Done", accumulated_content)
+                        );
+
                         let edit_params = EditMessageTextParams::builder()
                             .chat_id(ChatId::Integer(chat_id))
-                            .message_id(msg_id)
-                            .text(&text)
+                            .message_id(last_msg_id)
+                            .text(&final_text)
                             .parse_mode(ParseMode::Html)
                             .build();
 
                         if let Err(e) = api.edit_message_text(&edit_params).await {
-                            tracing::debug!("Failed to send final stream message: {}", e);
+                            tracing::debug!("Failed to edit final message: {}", e);
                         }
                         break;
                     }
@@ -460,7 +500,85 @@ impl TelegramService {
     fn cleanup_expired_tokens(&self) {
         self.pending_links.retain(|_, token| !token.is_expired());
     }
+}
 
+// ============================================================================
+// Streaming Helper Functions
+// ============================================================================
+
+/// Send or split a message to Telegram, creating multiple messages if needed
+async fn send_or_split_message(
+    api: &AsyncApi,
+    chat_id: i64,
+    task_name: &str,
+    content: &str,
+    message_ids: &mut Vec<i32>,
+) {
+    const MAX_CONTENT_LEN: usize = 3900; // Leave room for header/footer
+
+    if content.len() <= MAX_CONTENT_LEN {
+        // Single message - edit the last one
+        let text = format_stream_message(task_name, content);
+        let last_msg_id = *message_ids.last().unwrap();
+
+        let edit_params = EditMessageTextParams::builder()
+            .chat_id(ChatId::Integer(chat_id))
+            .message_id(last_msg_id)
+            .text(&text)
+            .parse_mode(ParseMode::Html)
+            .build();
+
+        if let Err(e) = api.edit_message_text(&edit_params).await {
+            tracing::debug!("Failed to edit message: {}", e);
+        }
+    } else {
+        // Need to split - find last newline before limit
+        let split_pos = content[..MAX_CONTENT_LEN]
+            .rfind('\n')
+            .unwrap_or(MAX_CONTENT_LEN);
+
+        let first_part = &content[..split_pos];
+        let remaining = &content[split_pos..].trim_start();
+
+        // Edit last message with first part
+        let last_msg_id = *message_ids.last().unwrap();
+        let text = format_stream_message(task_name, first_part);
+        let edit_params = EditMessageTextParams::builder()
+            .chat_id(ChatId::Integer(chat_id))
+            .message_id(last_msg_id)
+            .text(&text)
+            .parse_mode(ParseMode::Html)
+            .build();
+
+        if let Err(e) = api.edit_message_text(&edit_params).await {
+            tracing::debug!("Failed to edit message: {}", e);
+            return;
+        }
+
+        // Send new message for remaining content
+        let new_text = format!(
+            "🚀 <b>{}</b> (continued)\n\n<pre>{}</pre>",
+            escape_html(task_name),
+            escape_html(remaining)
+        );
+
+        let send_params = SendMessageParams::builder()
+            .chat_id(ChatId::Integer(chat_id))
+            .text(&new_text)
+            .parse_mode(ParseMode::Html)
+            .build();
+
+        match api.send_message(&send_params).await {
+            Ok(msg) => {
+                let new_msg_id = msg.result.message_id;
+                message_ids.push(new_msg_id);
+            }
+            Err(e) => tracing::debug!("Failed to send continuation message: {}", e),
+        }
+    }
+}
+
+impl TelegramService {
     // ========================================================================
     // Webhook Handling
     // ========================================================================
@@ -899,21 +1017,13 @@ fn format_entry(entry: &NormalizedEntry) -> Option<String> {
     }
 }
 
-/// Format a stream message for Telegram with truncation
+/// Format a stream message for Telegram
 fn format_stream_message(task_name: &str, content: &str) -> String {
-    // Telegram has a 4096 character limit per message
-    // Reserve space for header and footer
-    let max_content = 4096 - 100;
-    let truncated = if content.len() > max_content {
-        format!("...\n{}", &content[content.len() - max_content..])
-    } else {
-        content.to_string()
-    };
-
+    // No truncation needed - multi-message support handles overflow
     format!(
         "🚀 <b>{}</b>\n\n<pre>{}</pre>",
         escape_html(task_name),
-        escape_html(&truncated)
+        escape_html(content)
     )
 }
 
