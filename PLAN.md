@@ -14,7 +14,33 @@ Based on scope: [SCOPE.md](SCOPE.md)
 
 ## Future Features
 
-### Phase 1: Slash Commands
+### Phase 1: Real-Time Streaming ⬅️ NEXT
+
+> **Design Document**: [STREAM_FRONTEND.md](STREAM_FRONTEND.md)
+
+Mirror frontend's LLM output stream to Telegram in real-time.
+
+| Component | Description |
+|-----------|-------------|
+| `TelegramStreamService` | Subscribe to execution process broadcasts |
+| Message Buffer | Debounce + rate limit Telegram API calls |
+| Content Parser | Format raw executor output for Telegram |
+| Settings UI | Stream mode selector (off/summary/realtime/chunked) |
+
+**Streaming Modes:**
+- `off` - No live updates
+- `summary` - Current behavior (end-of-task summary)
+- `realtime` - Edit single message with growing content
+- `chunked` - New message every N seconds
+
+**Key Files:**
+- `crates/services/src/services/telegram_stream.rs` (new)
+- `crates/services/src/services/config/v10.rs` (add streaming settings)
+- `crates/local-deployment/src/container.rs` (hook stream on exec start)
+
+---
+
+### Phase 2: Slash Commands
 
 | Command | Description | Priority |
 |---------|-------------|----------|
@@ -30,7 +56,7 @@ Based on scope: [SCOPE.md](SCOPE.md)
 2. Route commands to handlers (`cmd_help`, `cmd_projects`, etc.)
 3. Format responses with Telegram HTML/Markdown
 
-### Phase 2: Project Context
+### Phase 3: Project Context
 
 Enable commands like `/tasks` without specifying project ID.
 
@@ -44,7 +70,7 @@ active_projects: Arc<DashMap<i64, ProjectId>>  // chat_id → project_id
 - `/project <id>` - Set active project
 - `/project` - Show current active project
 
-### Phase 3: Two-Way Messaging
+### Phase 4: Two-Way Messaging
 
 Send messages to active tasks via Telegram.
 
@@ -59,7 +85,7 @@ Send messages to active tasks via Telegram.
 - Integrate with `QueuedMessageService`
 - Add `TelegramService::cmd_message()`
 
-### Phase 4: Enhanced Notifications
+### Phase 5: Enhanced Notifications
 
 - **Per-project settings** - Choose which projects send notifications
 - **Message threading** - Link notifications to task context

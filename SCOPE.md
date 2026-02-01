@@ -3,8 +3,11 @@
 ## Overview
 
 This document outlines the scope of changes required to integrate vibe-kanban with a Telegram bot. The integration will enable:
-1. **Webhook notifications** when tasks are completed (with LLM response)
-2. **Slash command interactions** to create/manage tasks or send/queue messages
+1. **Real-time streaming** of LLM responses to Telegram (thinking, file edits, all output)
+2. **Webhook notifications** when tasks are completed
+3. **Slash command interactions** to create/manage tasks or send/queue messages
+
+> **Design Document**: See [STREAM_FRONTEND.md](STREAM_FRONTEND.md) for real-time streaming architecture.
 
 **Assumptions:**
 - Single user system (projects are not shared across users)
@@ -54,6 +57,10 @@ pub struct TelegramConfig {
     // Notification preferences
     pub notifications_enabled: bool,
     pub notify_on_task_done: bool,
+
+    // Real-time streaming settings (see STREAM_FRONTEND.md)
+    pub stream_mode: String,                  // "off", "summary", "realtime", "chunked"
+    pub stream_flush_interval_ms: u64,        // Debounce interval for message edits
 }
 ```
 
