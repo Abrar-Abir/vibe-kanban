@@ -4,39 +4,34 @@ Based on scope: [SCOPE.md](SCOPE.md)
 
 ## Progress Summary
 
-**Core Features: ✅ Complete**
+**All Core Features: ✅ Complete**
 - Account linking via deep link + `/start TOKEN`
 - Task completion notifications with LLM summary toggle
 - Settings UI with all toggles functional
 - Webhook handler for Telegram updates
+- Real-time streaming with human-readable content
 
 ---
 
 ## Future Features
 
-### Phase 1: Real-Time Streaming ⬅️ NEXT
+### Phase 1: Real-Time Streaming ✅ COMPLETE
 
-> **Design Document**: [STREAM_FRONTEND.md](STREAM_FRONTEND.md)
+Streams LLM output to Telegram in real-time as tasks run.
 
-Mirror frontend's LLM output stream to Telegram in real-time.
+**What's Implemented:**
+- `spawn_stream_to_telegram()` in `telegram.rs` - Subscribes to MsgStore broadcasts
+- Debounced updates (500ms) to respect Telegram rate limits
+- `format_entry()` helper - Formats NormalizedEntry with icons
+- Settings toggle (`stream_enabled`) in UI
 
-| Component | Description |
-|-----------|-------------|
-| `TelegramStreamService` | Subscribe to execution process broadcasts |
-| Message Buffer | Debounce + rate limit Telegram API calls |
-| Content Parser | Format raw executor output for Telegram |
-| Settings UI | Stream mode selector (off/summary/realtime/chunked) |
-
-**Streaming Modes:**
-- `off` - No live updates
-- `summary` - Current behavior (end-of-task summary)
-- `realtime` - Edit single message with growing content
-- `chunked` - New message every N seconds
-
-**Key Files:**
-- `crates/services/src/services/telegram_stream.rs` (new)
-- `crates/services/src/services/config/v10.rs` (add streaming settings)
-- `crates/local-deployment/src/container.rs` (hook stream on exec start)
+**Icons:**
+- 💬 Assistant messages
+- 💭 Thinking (truncated to 200 chars)
+- 📖 File reads / 📝 File edits
+- ⚡ Command execution
+- 🔍 Searches / 🌐 Web fetches
+- ❌ Errors
 
 ---
 

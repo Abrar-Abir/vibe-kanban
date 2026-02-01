@@ -1,6 +1,6 @@
 # Telegram Bot Integration - Progress
 
-## Status: Core Features Complete | Next: Real-Time Streaming
+## Status: ✅ All Core Features Complete
 
 | Phase | Status |
 |-------|--------|
@@ -9,19 +9,17 @@
 | Frontend (Settings UI, TypeScript types) | ✅ |
 | Webhook & Auto-linking (/start command, deep links) | ✅ |
 | Settings API & LLM Summaries | ✅ |
-| Real-Time Streaming | 🔜 Next |
+| Real-Time Streaming | ✅ |
 
-## Next Up: Real-Time Streaming
+## Real-Time Streaming (Completed)
 
-> **Design**: [STREAM_FRONTEND.md](STREAM_FRONTEND.md)
+Streams LLM output to Telegram in real-time as tasks run.
 
-Replace end-of-task LLM summaries with real-time streaming of all LLM output (thinking, file edits, tool usage) to Telegram.
-
-**Key Components:**
-- `TelegramStreamService` - Subscribe to execution process broadcasts
-- Message Buffer + Rate Limiter - Debounce Telegram API calls
-- Content Parser - Format raw executor output
-- Settings UI - Stream mode selector
+**Features:**
+- Human-readable content with icons (💬 messages, 💭 thinking, 📝 edits, ⚡ commands)
+- Debounced updates (500ms) to respect Telegram rate limits
+- Message truncation (4096 char Telegram limit)
+- Settings toggle to enable/disable streaming
 
 ## What's Working
 
