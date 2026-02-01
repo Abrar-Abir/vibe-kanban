@@ -384,7 +384,7 @@ export type ShowcaseState = { seen_features: Array<string>, };
 
 export type SendMessageShortcut = "ModifierEnter" | "Enter";
 
-export type TelegramConfig = { chat_id: bigint | null, user_id: bigint | null, username: string | null, notifications_enabled: boolean, notify_on_task_done: boolean, include_llm_summary: boolean, };
+export type TelegramConfig = { chat_id: bigint | null, user_id: bigint | null, username: string | null, notifications_enabled: boolean, notify_on_task_done: boolean, include_llm_summary: boolean, stream_enabled: boolean, };
 
 export type TelegramLinkInfo = { 
 /**
@@ -422,6 +422,10 @@ notify_on_task_done: boolean,
  */
 include_llm_summary: boolean, 
 /**
+ * Whether real-time streaming is enabled
+ */
+stream_enabled: boolean, 
+/**
  * Whether the bot is configured (has a token)
  */
 bot_configured: boolean, };
@@ -438,7 +442,11 @@ notify_on_task_done: boolean | null,
 /**
  * Whether to include LLM summaries in notifications
  */
-include_llm_summary: boolean | null, };
+include_llm_summary: boolean | null, 
+/**
+ * Whether to enable real-time streaming
+ */
+stream_enabled: boolean | null, };
 
 export type GitBranch = { name: string, is_current: boolean, is_remote: boolean, last_commit_date: Date, };
 

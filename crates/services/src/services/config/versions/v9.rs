@@ -25,6 +25,8 @@ pub struct TelegramConfig {
     pub notifications_enabled: bool,
     pub notify_on_task_done: bool,
     pub include_llm_summary: bool,
+    #[serde(default)]
+    pub stream_enabled: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -164,6 +166,7 @@ mod tests {
         assert!(!config.notifications_enabled);
         assert!(!config.notify_on_task_done);
         assert!(!config.include_llm_summary);
+        assert!(!config.stream_enabled);
     }
 
     #[test]
@@ -175,6 +178,7 @@ mod tests {
             notifications_enabled: true,
             notify_on_task_done: true,
             include_llm_summary: false,
+            stream_enabled: true,
         };
 
         let json = serde_json::to_string(&config).unwrap();
@@ -186,6 +190,7 @@ mod tests {
         assert!(deserialized.notifications_enabled);
         assert!(deserialized.notify_on_task_done);
         assert!(!deserialized.include_llm_summary);
+        assert!(deserialized.stream_enabled);
     }
 
     // ========================================================================
@@ -261,6 +266,7 @@ mod tests {
         assert!(!config.telegram.notifications_enabled);
         assert!(!config.telegram.notify_on_task_done);
         assert!(!config.telegram.include_llm_summary);
+        assert!(!config.telegram.stream_enabled);
     }
 
     #[test]
@@ -303,7 +309,8 @@ mod tests {
                 "username": "testuser",
                 "notifications_enabled": true,
                 "notify_on_task_done": true,
-                "include_llm_summary": true
+                "include_llm_summary": true,
+                "stream_enabled": true
             }
         }"#;
 
@@ -316,6 +323,7 @@ mod tests {
         assert!(config.telegram.notifications_enabled);
         assert!(config.telegram.notify_on_task_done);
         assert!(config.telegram.include_llm_summary);
+        assert!(config.telegram.stream_enabled);
     }
 
     #[test]
@@ -358,7 +366,8 @@ mod tests {
                 "username": null,
                 "notifications_enabled": false,
                 "notify_on_task_done": false,
-                "include_llm_summary": false
+                "include_llm_summary": false,
+                "stream_enabled": false
             }
         }"#;
 

@@ -1216,6 +1216,16 @@ pub trait ContainerService {
         let db_stream_handle = self.spawn_stream_raw_logs_to_db(&execution_process.id);
         self.store_db_stream_handle(execution_process.id, db_stream_handle)
             .await;
+
+        // Spawn Telegram streaming if enabled
+        if let Some(telegram) = self.telegram_service() {
+            telegram.spawn_stream_to_telegram(
+                execution_process.id,
+                task.title.clone(),
+                self.msg_stores().clone(),
+            );
+        }
+
         Ok(execution_process)
     }
 

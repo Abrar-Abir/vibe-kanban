@@ -6,7 +6,7 @@
 //! - Webhook handling for bot commands
 //! - Slash command handling (/start, /help, /projects, etc.)
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
@@ -14,12 +14,23 @@ use db::models::{
     project::Project,
     task::{CreateTask, Task, TaskStatus},
 };
-use frankenstein::{
-    AsyncApi, AsyncTelegramApi, ChatId, ParseMode, SendMessageParams, Update, UpdateContent,
+use executors::logs::{
+    utils::patch::extract_normalized_entry_from_patch, ActionType, NormalizedEntry,
+    NormalizedEntryType,
 };
+use frankenstein::{
+    AsyncApi, AsyncTelegramApi, ChatId, EditMessageTextParams, ParseMode, SendMessageParams,
+    Update, UpdateContent,
+};
+use futures::StreamExt;
 use sqlx::SqlitePool;
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::{
+    sync::RwLock,
+    task::JoinHandle,
+    time::{Duration, Instant},
+};
+use utils::{log_msg::LogMsg, msg_store::MsgStore};
 use uuid::Uuid;
 
 use crate::services::config::{Config, TelegramConfig};
@@ -299,6 +310,7 @@ impl TelegramService {
         notifications_enabled: Option<bool>,
         notify_on_task_done: Option<bool>,
         include_llm_summary: Option<bool>,
+        stream_enabled: Option<bool>,
     ) -> Result<TelegramConfig, TelegramError> {
         let mut config = self.config.write().await;
 
@@ -311,8 +323,137 @@ impl TelegramService {
         if let Some(v) = include_llm_summary {
             config.telegram.include_llm_summary = v;
         }
+        if let Some(v) = stream_enabled {
+            config.telegram.stream_enabled = v;
+        }
 
         Ok(config.telegram.clone())
+    }
+
+    // ========================================================================
+    // Real-Time Streaming
+    // ========================================================================
+
+    /// Spawn a task that streams execution output to Telegram in real-time.
+    ///
+    /// The spawned task subscribes to the MsgStore broadcast channel and
+    /// sends/edits a single Telegram message with the growing output.
+    /// Updates are debounced to avoid hitting Telegram API rate limits.
+    pub fn spawn_stream_to_telegram(
+        &self,
+        execution_id: Uuid,
+        task_name: String,
+        msg_stores: Arc<RwLock<HashMap<Uuid, Arc<MsgStore>>>>,
+    ) -> Option<JoinHandle<()>> {
+        // Clone what we need for the spawned task
+        let config = self.config.clone();
+        let api = self.api.clone()?;
+
+        Some(tokio::spawn(async move {
+            // Check if streaming is enabled (inside async context)
+            let config_guard = config.read().await;
+            if !config_guard.telegram.stream_enabled || !config_guard.telegram.notifications_enabled
+            {
+                return;
+            }
+            let Some(chat_id) = config_guard.telegram.chat_id else {
+                return;
+            };
+            drop(config_guard);
+
+            // Get MsgStore
+            let store = {
+                let map = msg_stores.read().await;
+                map.get(&execution_id).cloned()
+            };
+
+            let Some(store) = store else {
+                tracing::debug!("No MsgStore found for execution {}", execution_id);
+                return;
+            };
+
+            // Send initial message
+            let initial_text = format!(
+                "🚀 <b>{}</b>\n\n⏳ Starting...",
+                escape_html(&task_name)
+            );
+            let send_params = SendMessageParams::builder()
+                .chat_id(ChatId::Integer(chat_id))
+                .text(&initial_text)
+                .parse_mode(ParseMode::Html)
+                .build();
+
+            let msg_id = match api.send_message(&send_params).await {
+                Ok(response) => response.result.message_id,
+                Err(e) => {
+                    tracing::warn!("Failed to send initial stream message: {}", e);
+                    return;
+                }
+            };
+
+            // Buffer for debouncing
+            let mut buffer = String::new();
+            let mut last_update = Instant::now();
+            let flush_interval = Duration::from_millis(500);
+
+            tracing::debug!("Telegram streaming started for execution {}", execution_id);
+
+            let mut stream = store.history_plus_stream();
+            while let Some(Ok(msg)) = stream.next().await {
+                match msg {
+                    LogMsg::JsonPatch(patch) => {
+                        tracing::debug!("Received JsonPatch in Telegram stream");
+                        // Extract NormalizedEntry from the patch
+                        if let Some((_, entry)) = extract_normalized_entry_from_patch(&patch) {
+                            tracing::debug!("Extracted entry type: {:?}", entry.entry_type);
+                            if let Some(formatted) = format_entry(&entry) {
+                                tracing::debug!("Formatted entry: {}", formatted);
+                                if !buffer.is_empty() {
+                                    buffer.push('\n');
+                                }
+                                buffer.push_str(&formatted);
+
+                                // Debounce updates
+                                if last_update.elapsed() >= flush_interval {
+                                    let text = format_stream_message(&task_name, &buffer);
+                                    let edit_params = EditMessageTextParams::builder()
+                                        .chat_id(ChatId::Integer(chat_id))
+                                        .message_id(msg_id)
+                                        .text(&text)
+                                        .parse_mode(ParseMode::Html)
+                                        .build();
+
+                                    if let Err(e) = api.edit_message_text(&edit_params).await {
+                                        tracing::debug!("Failed to edit stream message: {}", e);
+                                    }
+                                    last_update = Instant::now();
+                                }
+                            }
+                        }
+                    }
+                    LogMsg::Finished => {
+                        tracing::debug!("Telegram stream finished, buffer length: {}", buffer.len());
+                        // Final update
+                        let text = format_stream_message(&task_name, &buffer) + "\n\n✅ Done";
+                        let edit_params = EditMessageTextParams::builder()
+                            .chat_id(ChatId::Integer(chat_id))
+                            .message_id(msg_id)
+                            .text(&text)
+                            .parse_mode(ParseMode::Html)
+                            .build();
+
+                        if let Err(e) = api.edit_message_text(&edit_params).await {
+                            tracing::debug!("Failed to send final stream message: {}", e);
+                        }
+                        break;
+                    }
+                    LogMsg::Stdout(_) => {
+                        tracing::trace!("Telegram stream received Stdout (ignored)");
+                    }
+                    _ => {} // Ignore Stderr, etc.
+                }
+            }
+        }))
     }
 
     /// Clean up expired link tokens
@@ -710,6 +851,72 @@ fn escape_html(text: &str) -> String {
         .replace('>', "&gt;")
 }
 
+/// Format a NormalizedEntry for Telegram display
+fn format_entry(entry: &NormalizedEntry) -> Option<String> {
+    match &entry.entry_type {
+        NormalizedEntryType::AssistantMessage => {
+            let content = entry.content.trim();
+            if content.is_empty() {
+                None
+            } else {
+                Some(format!("💬 {}", content))
+            }
+        }
+        NormalizedEntryType::Thinking => {
+            let content = entry.content.trim();
+            if content.is_empty() {
+                None
+            } else {
+                // Truncate long thinking content
+                let truncated = if content.len() > 200 {
+                    format!("{}...", &content[..200])
+                } else {
+                    content.to_string()
+                };
+                Some(format!("💭 {}", truncated))
+            }
+        }
+        NormalizedEntryType::ToolUse {
+            tool_name,
+            action_type,
+            ..
+        } => {
+            let icon = match action_type {
+                ActionType::FileRead { path } => format!("📖 Reading: {}", path),
+                ActionType::FileEdit { path, .. } => format!("📝 Editing: {}", path),
+                ActionType::CommandRun { command, .. } => format!("⚡ Running: {}", command),
+                ActionType::Search { query } => format!("🔍 Searching: {}", query),
+                ActionType::WebFetch { url } => format!("🌐 Fetching: {}", url),
+                _ => format!("🔧 {}", tool_name),
+            };
+            Some(icon)
+        }
+        NormalizedEntryType::ErrorMessage { .. } => {
+            Some(format!("❌ {}", entry.content.trim()))
+        }
+        // Skip user messages, system messages, loading states
+        _ => None,
+    }
+}
+
+/// Format a stream message for Telegram with truncation
+fn format_stream_message(task_name: &str, content: &str) -> String {
+    // Telegram has a 4096 character limit per message
+    // Reserve space for header and footer
+    let max_content = 4096 - 100;
+    let truncated = if content.len() > max_content {
+        format!("...\n{}", &content[content.len() - max_content..])
+    } else {
+        content.to_string()
+    };
+
+    format!(
+        "🚀 <b>{}</b>\n\n<pre>{}</pre>",
+        escape_html(task_name),
+        escape_html(&truncated)
+    )
+}
+
 /// Parse a UUID from a string, supporting short prefixes
 fn parse_uuid(s: &str) -> Result<Uuid, TelegramError> {
     let s = s.trim();
@@ -999,5 +1206,34 @@ mod tests {
         assert!(!config.notifications_enabled);
         assert!(!config.notify_on_task_done);
         assert!(!config.include_llm_summary);
+        assert!(!config.stream_enabled);
+    }
+
+    // ========================================================================
+    // Stream Message Formatting Tests
+    // ========================================================================
+
+    #[test]
+    fn test_format_stream_message_basic() {
+        let result = format_stream_message("Test Task", "Hello world");
+        assert!(result.contains("Test Task"));
+        assert!(result.contains("Hello world"));
+    }
+
+    #[test]
+    fn test_format_stream_message_escapes_html() {
+        let result = format_stream_message("<script>", "a < b && c > d");
+        assert!(result.contains("&lt;script&gt;"));
+        assert!(result.contains("a &lt; b &amp;&amp; c &gt; d"));
+    }
+
+    #[test]
+    fn test_format_stream_message_truncates_long_content() {
+        let long_content = "x".repeat(5000);
+        let result = format_stream_message("Task", &long_content);
+        // Result should be under 4096 chars
+        assert!(result.len() < 4096);
+        // Should have truncation indicator
+        assert!(result.contains("..."));
     }
 }

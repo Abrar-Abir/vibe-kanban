@@ -12,6 +12,7 @@ interface TelegramStatus {
   notifications_enabled: boolean;
   notify_on_task_done: boolean;
   include_llm_summary: boolean;
+  stream_enabled: boolean;
   bot_configured: boolean;
 }
 
@@ -105,7 +106,7 @@ export function IntegrationsSettingsSectionContent() {
   };
 
   const handleSettingChange = async (
-    setting: 'notifications_enabled' | 'notify_on_task_done' | 'include_llm_summary',
+    setting: 'notifications_enabled' | 'notify_on_task_done' | 'include_llm_summary' | 'stream_enabled',
     value: boolean
   ) => {
     setUpdatingSetting(setting);
@@ -226,6 +227,19 @@ export function IntegrationsSettingsSectionContent() {
                 checked={status.include_llm_summary}
                 onChange={(checked) => handleSettingChange('include_llm_summary', checked)}
                 disabled={updatingSetting === 'include_llm_summary' || !status.notifications_enabled}
+              />
+
+              <SettingsCheckbox
+                id="telegram-stream-enabled"
+                label={t(
+                  'integrations.telegram.streamEnabled.label'
+                )}
+                description={t(
+                  'integrations.telegram.streamEnabled.description'
+                )}
+                checked={status.stream_enabled}
+                onChange={(checked) => handleSettingChange('stream_enabled', checked)}
+                disabled={updatingSetting === 'stream_enabled' || !status.notifications_enabled}
               />
             </div>
           </div>

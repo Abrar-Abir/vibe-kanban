@@ -501,6 +501,10 @@
         "label": "Include AI Summary",
         "description": "Include an AI-generated summary in task completion notifications."
       },
+      "streamEnabled": {
+        "label": "Real-Time Streaming",
+        "description": "Stream LLM output to Telegram in real-time as tasks run."
+      },
       "manualLinkTitle": "Or link manually:",
       "manualStep1": "Open Telegram and search for @{{botUsername}}",
       "manualStep2": "Send this command to the bot:",

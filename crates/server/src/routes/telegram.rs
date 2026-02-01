@@ -52,6 +52,8 @@ pub struct TelegramStatusResponse {
     pub notify_on_task_done: bool,
     /// Whether to include LLM summaries in notifications
     pub include_llm_summary: bool,
+    /// Whether real-time streaming is enabled
+    pub stream_enabled: bool,
     /// Whether the bot is configured (has a token)
     pub bot_configured: bool,
 }
@@ -64,6 +66,7 @@ impl From<TelegramConfig> for TelegramStatusResponse {
             notifications_enabled: config.notifications_enabled,
             notify_on_task_done: config.notify_on_task_done,
             include_llm_summary: config.include_llm_summary,
+            stream_enabled: config.stream_enabled,
             bot_configured: false, // Set by the handler
         }
     }
@@ -79,6 +82,8 @@ pub struct UpdateTelegramSettingsRequest {
     pub notify_on_task_done: Option<bool>,
     /// Whether to include LLM summaries in notifications
     pub include_llm_summary: Option<bool>,
+    /// Whether to enable real-time streaming
+    pub stream_enabled: Option<bool>,
 }
 
 /// Create the Telegram router.
@@ -239,6 +244,7 @@ async fn update_settings(
             request.notifications_enabled,
             request.notify_on_task_done,
             request.include_llm_summary,
+            request.stream_enabled,
         )
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
